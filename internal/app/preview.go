@@ -3,7 +3,10 @@ package app
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -12,7 +15,10 @@ const (
 	scannerMaxSize  = 10 * 1024 * 1024
 	maxCwdLines     = 200
 	maxPreviewLines = 400
+	modelReadChunk  = 64 * 1024
 )
+
+var claudeModelRe = regexp.MustCompile(`^claude-(fable|opus|sonnet|haiku)-(\d+)(?:-(\d+))?`)
 
 func ExtractPreview(path string) (string, error) {
 	file, err := os.Open(path)
@@ -137,6 +143,7 @@ type record struct {
 type message struct {
 	Role    string          `json:"role"`
 	Content json.RawMessage `json:"content"`
+	Model   string          `json:"model"`
 }
 
 func parseRecord(line string) (record, bool) {
@@ -276,4 +283,73 @@ func ExtractCWD(path string) (string, error) {
 	}
 
 	return "", nil
+}
+
+func ExtractSessionModel(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	var carry []byte
+	for offset := info.Size(); offset > 0; {
+		size := int64(modelReadChunk)
+		if offset < size {
+			size = offset
+		}
+		offset -= size
+
+		chunk := make([]byte, size)
+		if _, err := file.ReadAt(chunk, offset); err != nil && err != io.EOF {
+			return "", err
+		}
+		chunk = append(chunk, carry...)
+		lines := strings.Split(string(chunk), "\n")
+
+		start := 0
+		if offset > 0 {
+			carry = []byte(lines[0])
+			start = 1
+		} else {
+			carry = nil
+		}
+
+		for i := len(lines) - 1; i >= start; i-- {
+			line := strings.TrimSpace(lines[i])
+			if line == "" {
+				continue
+			}
+			rec, ok := parseRecord(line)
+			if !ok || !isAssistantRecord(rec) {
+				continue
+			}
+			model := strings.TrimSpace(rec.Message.Model)
+			if model != "" && model != "<synthetic>" {
+				return model, nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
+func ModelDisplayName(model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return "Session model unknown"
+	}
+	if matches := claudeModelRe.FindStringSubmatch(model); len(matches) == 4 {
+		family := strings.ToUpper(matches[1][:1]) + matches[1][1:]
+		if matches[3] == "" {
+			return fmt.Sprintf("Claude %s %s", family, matches[2])
+		}
+		return fmt.Sprintf("Claude %s %s.%s", family, matches[2], matches[3])
+	}
+	return model
 }

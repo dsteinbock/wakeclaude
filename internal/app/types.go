@@ -17,6 +17,7 @@ type Session struct {
 	ModTime time.Time `json:"mod_time"`
 	RelTime string    `json:"rel_time"`
 	Preview string    `json:"preview"`
+	Model   string    `json:"model,omitempty"`
 }
 
 type ModelOption struct {

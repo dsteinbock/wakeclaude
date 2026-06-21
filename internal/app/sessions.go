@@ -98,6 +98,7 @@ func CollectSessions(projectPath string) ([]Session, error) {
 type previewResult struct {
 	index   int
 	preview string
+	model   string
 }
 
 func fillSessionPreviews(sessions []Session) {
@@ -126,7 +127,11 @@ func fillSessionPreviews(sessions []Session) {
 				if err != nil {
 					preview = ""
 				}
-				results <- previewResult{index: idx, preview: preview}
+				model, err := ExtractSessionModel(sessions[idx].Path)
+				if err != nil {
+					model = ""
+				}
+				results <- previewResult{index: idx, preview: preview, model: model}
 			}
 		}()
 	}
@@ -141,5 +146,6 @@ func fillSessionPreviews(sessions []Session) {
 
 	for res := range results {
 		sessions[res.index].Preview = res.preview
+		sessions[res.index].Model = res.model
 	}
 }

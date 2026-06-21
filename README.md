@@ -86,9 +86,14 @@ controls:
 ## models + permission modes
 
 models:
+- `fable`
 - `opus`
 - `sonnet`
 - `haiku`
+
+new sessions use the selected Claude Code model alias, which tracks the
+recommended version in that model family. resumed sessions keep the model
+stored in the Claude session and skip model selection.
 
 permission modes:
 - `acceptEdits` – auto‑accept file edits + filesystem access

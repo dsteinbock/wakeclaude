@@ -107,7 +107,7 @@ func main() {
 	}
 
 	models := []app.ModelOption{
-		{Label: "Default (auto)", Value: "auto"},
+		{Label: "Fable", Value: "fable"},
 		{Label: "Opus", Value: "opus"},
 		{Label: "Sonnet", Value: "sonnet"},
 		{Label: "Haiku", Value: "haiku"},
@@ -278,7 +278,7 @@ func buildEntry(draft *tui.Draft, existing *scheduler.ScheduleEntry) (scheduler.
 	}
 
 	model := strings.TrimSpace(draft.Model)
-	if model == "" {
+	if model == "" && draft.NewSession {
 		model = "auto"
 	}
 	perm := strings.TrimSpace(draft.Permission)

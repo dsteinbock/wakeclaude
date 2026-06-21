@@ -187,7 +187,12 @@ type model struct {
 func newModel(input Input) model {
 	models := input.Models
 	if len(models) == 0 {
-		models = []app.ModelOption{{Label: "Default (auto)", Value: "auto"}}
+		models = []app.ModelOption{
+			{Label: "Fable", Value: "fable"},
+			{Label: "Opus", Value: "opus"},
+			{Label: "Sonnet", Value: "sonnet"},
+			{Label: "Haiku", Value: "haiku"},
+		}
 	}
 
 	search := textinput.New()
@@ -732,6 +737,9 @@ func (m model) sessionLabel() string {
 }
 
 func (m model) modelLabel() string {
+	if !m.selectedNew && m.selectedSess != nil {
+		return app.ModelDisplayName(m.selectedSess.Model)
+	}
 	if m.selectedModel.Label != "" {
 		return m.selectedModel.Label
 	}
@@ -833,8 +841,9 @@ func (m *model) setSessionItems() {
 		if title == "" {
 			continue
 		}
-		meta := session.RelTime
-		filter := strings.ToLower(strings.Join([]string{title, session.ID}, " "))
+		model := app.ModelDisplayName(session.Model)
+		meta := strings.Join(nonEmptyStrings(model, session.RelTime), " · ")
+		filter := strings.ToLower(strings.Join([]string{title, session.ID, model}, " "))
 		items = append(items, listItem{
 			title:  title,
 			meta:   meta,
@@ -1132,9 +1141,13 @@ func (m *model) handleBack() (tea.Model, tea.Cmd) {
 		m.promptInput.Focus()
 		return m, nil
 	case stagePermissionMode:
-		m.stage = stageModels
-		m.searchInput.Focus()
-		m.setModelItems()
+		if m.selectedNew {
+			m.stage = stageModels
+			m.searchInput.Focus()
+			m.setModelItems()
+		} else {
+			m.startPromptStage()
+		}
 		return m, nil
 	case stagePrompt:
 		m.stage = stageSessions
@@ -1313,7 +1326,11 @@ func (m *model) updatePrompt(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		m.promptText = value
-		m.startModelStage()
+		if m.selectedNew {
+			m.startModelStage()
+		} else {
+			m.startPermissionModeStage()
+		}
 		return m, cmd
 	}
 
@@ -1643,7 +1660,11 @@ func (m *model) startEditFlow(entry scheduler.ScheduleEntry) {
 		}
 	}
 
-	m.selectedModel = m.findModel(entry.Model)
+	if entry.NewSession {
+		m.selectedModel = m.findModel(entry.Model)
+	} else {
+		m.selectedModel = app.ModelOption{}
+	}
 	if entry.PermissionMode != "" && entry.PermissionMode != "default" {
 		m.selectedPerm = entry.PermissionMode
 	} else {
@@ -1669,16 +1690,17 @@ func (m *model) finishResult() {
 	}
 	draft := &Draft{
 		ProjectPath: projectPath,
-		Model:       m.selectedModel.Value,
 		Permission:  m.selectedPerm,
 		Prompt:      m.promptText,
 		Schedule:    m.schedule,
 	}
 	if m.selectedNew {
 		draft.NewSession = true
+		draft.Model = m.selectedModel.Value
 	} else if m.selectedSess != nil {
 		draft.SessionID = m.selectedSess.ID
 		draft.SessionPath = m.selectedSess.Path
+		draft.Model = m.selectedSess.Model
 	}
 
 	kind := ActionSchedule
@@ -2719,7 +2741,17 @@ func (m *model) findModel(value string) app.ModelOption {
 	if len(m.models) > 0 {
 		return m.models[0]
 	}
-	return app.ModelOption{Value: "auto", Label: "Default (auto)"}
+	return app.ModelOption{Value: "fable", Label: "Fable"}
+}
+
+func nonEmptyStrings(values ...string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 var asciiArtLines = []string{

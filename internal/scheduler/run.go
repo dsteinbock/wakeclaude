@@ -135,17 +135,7 @@ func buildClaudeCommand(entry ScheduleEntry) (*exec.Cmd, error) {
 		workDir = entry.HomeDir
 	}
 
-	args := []string{"-p"}
-	if entry.Model != "" && entry.Model != "auto" {
-		args = append(args, "--model", entry.Model)
-	}
-	if entry.PermissionMode != "" && entry.PermissionMode != "default" {
-		args = append(args, "--permission-mode", entry.PermissionMode)
-	}
-	if !entry.NewSession && entry.SessionID != "" {
-		args = append(args, "--resume", entry.SessionID)
-	}
-	args = append(args, entry.Prompt)
+	args := claudeArgs(entry)
 
 	if os.Geteuid() == 0 && entry.UID > 0 {
 		cmd := exec.Command("/bin/launchctl", append([]string{
@@ -181,6 +171,21 @@ func buildClaudeCommand(entry ScheduleEntry) (*exec.Cmd, error) {
 	}...)
 
 	return cmd, nil
+}
+
+func claudeArgs(entry ScheduleEntry) []string {
+	args := []string{"-p"}
+	resuming := !entry.NewSession && entry.SessionID != ""
+	if !resuming && entry.Model != "" && entry.Model != "auto" {
+		args = append(args, "--model", entry.Model)
+	}
+	if entry.PermissionMode != "" && entry.PermissionMode != "default" {
+		args = append(args, "--permission-mode", entry.PermissionMode)
+	}
+	if resuming {
+		args = append(args, "--resume", entry.SessionID)
+	}
+	return append(args, entry.Prompt)
 }
 
 func resolveWorkDir(entry ScheduleEntry) string {
