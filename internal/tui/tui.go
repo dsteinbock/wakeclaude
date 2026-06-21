@@ -267,9 +267,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		switch msgTyped.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			m.err = ErrUserQuit
 			return m, tea.Quit
+		case "q":
+			if m.stage != stagePrompt {
+				m.err = ErrUserQuit
+				return m, tea.Quit
+			}
 		case "esc":
 			return m.handleBack()
 		}
@@ -339,7 +344,7 @@ func (m model) renderPrompt(b *strings.Builder, width int) {
 		b.WriteString(renderLine(fmt.Sprintf("Error: %s", m.inputError), width))
 		b.WriteString("\n")
 	}
-	b.WriteString("ctrl+d continue | esc back | q quit\n")
+	b.WriteString("ctrl+d continue | esc back\n")
 }
 
 func (m model) renderScheduleDate(b *strings.Builder, width int) {
